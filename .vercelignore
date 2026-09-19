@@ -1,0 +1,4 @@
+# Development-only. Nothing here is needed to play the game, and
+# tools/serve.js is server code that has no business on a static host.
+tools/
+.gitignore

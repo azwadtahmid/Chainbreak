@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="CHAINBREAK — defend a live blockchain network. Brunel Blockchain Society.">
+
+<!-- The game loads no third-party code and makes no network requests, so it
+     can run under a strict policy. connect-src 'none' means that if anything
+     ever tries to phone home, the browser blocks it rather than trusting us.
+     (Headers a meta tag cannot set — X-Frame-Options, X-Content-Type-Options,
+     HSTS — are listed for the host in README.md.) -->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'none';
+  script-src 'self';
+  style-src 'self';
+  img-src 'self' data:;
+  font-src 'self';
+  connect-src 'none';
+  form-action 'none';
+  base-uri 'none';
+  frame-ancestors 'none';
+  object-src 'none'">
+<meta name="referrer" content="no-referrer">
+
+<title>CHAINBREAK</title>
+<link rel="icon" href="assets/logo-mark.png" type="image/png">
+<link rel="apple-touch-icon" href="assets/logo.png">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ START SCREEN ============ -->
+  <section id="screen-start" class="screen is-active">
+    <canvas id="start-canvas" aria-hidden="true"></canvas>
+    <div class="start-inner">
+      <img class="start-logo" src="assets/logo.png" alt="Brunel Blockchain Society">
+      <h1 class="game-title" data-text="CHAINBREAK">CHAINBREAK</h1>
+      <p class="game-tagline">DEFEND THE NETWORK. PROTECT THE CHAIN.</p>
+      <p class="game-question">&ldquo;Can you keep the blockchain alive?&rdquo;</p>
+
+      <div class="start-buttons">
+        <button id="btn-start" class="btn btn-hero" type="button">START GAME</button>
+        <button id="btn-demo" class="btn btn-secondary" type="button">HOW TO PLAY</button>
+        <button id="btn-board" class="btn btn-secondary" type="button">LEADERBOARD</button>
+      </div>
+
+      <p class="start-hint">Use your mouse or keyboard. First time? Try <b>HOW TO PLAY</b>.</p>
+      <p class="start-plays" id="start-plays"></p>
+
+      <div class="start-footer">
+        <span class="society-line">LEARN. BUILD. CONNECT.</span>
+        <button id="btn-mute-start" class="btn-ghost btn-mute" type="button" aria-pressed="false">
+          <span class="mute-icon" aria-hidden="true">&#9834;</span><span class="mute-label">SOUND ON</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ HALL OF VALIDATORS ============ -->
+  <section id="screen-board" class="screen board-screen">
+    <div class="board-inner">
+      <div class="board-head">
+        <img class="board-logo" src="assets/logo.png" alt="Brunel Blockchain Society">
+        <div>
+          <h2 class="board-title">HALL OF VALIDATORS</h2>
+          <p class="board-sub">EVERYONE WHO HAS DEFENDED THE CHAIN ON THIS MACHINE</p>
+        </div>
+      </div>
+
+      <div class="board-totals" id="board-totals"></div>
+
+      <ol class="leaderboard leaderboard-full" id="leaderboard-full"></ol>
+
+      <div class="board-foot">
+        <button id="btn-board-back" class="btn btn-hero-sm" type="button">&lsaquo; BACK</button>
+        <p class="board-note" id="board-storage-note"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ ONBOARDING ============ -->
+  <section id="screen-onboard" class="screen onboard" aria-live="polite">
+    <div class="onboard-lines">
+      <p class="onboard-line" data-step="0">TRANSACTIONS ARE ENTERING THE NETWORK.</p>
+      <p class="onboard-line" data-step="1">VALIDATE THEM.</p>
+      <p class="onboard-line" data-step="2">PROTECT THE CHAIN.</p>
+      <p class="onboard-line" data-step="3">SURVIVE THE ATTACKS.</p>
+    </div>
+    <button id="btn-skip-onboard" class="btn-ghost skip-btn" type="button">SKIP &rsaquo;</button>
+  </section>
+
+  <!-- ============ GAME ============ -->
+  <main id="screen-game" class="screen game">
+
+    <header class="topbar">
+      <div class="topbar-brand">
+        <img class="topbar-logo" src="assets/logo-mark.png" alt="">
+        <span class="brand-text">BRUNEL<br><b>BLOCKCHAIN SOCIETY</b></span>
+      </div>
+
+      <div class="stat stat-integrity">
+        <span class="stat-label">CHAIN INTEGRITY</span>
+        <div class="integrity-wrap">
+          <span class="stat-value" id="ui-integrity">100%</span>
+          <div class="integrity-bar"><i id="ui-integrity-bar"></i></div>
+        </div>
+      </div>
+
+      <div class="stat">
+        <span class="stat-label">SCORE</span>
+        <span class="stat-value" id="ui-score">0</span>
+      </div>
+
+      <div class="stat stat-combo" id="ui-combo-wrap">
+        <span class="stat-label">COMBO</span>
+        <span class="stat-value" id="ui-combo">&times;1</span>
+      </div>
+
+      <div class="stat stat-time">
+        <span class="stat-label">TIME</span>
+        <span class="stat-value" id="ui-time">120</span>
+      </div>
+
+      <div class="stat stat-threat" id="ui-threat-wrap">
+        <span class="stat-label">THREAT LEVEL</span>
+        <span class="stat-value" id="ui-threat">LOW</span>
+      </div>
+
+      <button id="btn-mute" class="btn-ghost btn-mute" type="button" aria-pressed="false" title="Mute (M)">
+        <span class="mute-icon" aria-hidden="true">&#9834;</span>
+      </button>
+    </header>
+
+    <div class="stage">
+      <!-- LEFT: network + chain -->
+      <div class="stage-main">
+
+        <section class="panel-block network-block">
+          <div class="block-head">
+            <h2>NETWORK NODES</h2>
+            <span class="head-meta" id="ui-node-meta">5 ONLINE &middot; CONSENSUS STABLE</span>
+          </div>
+          <div class="network-wrap">
+            <canvas id="net-canvas"></canvas>
+            <div id="node-layer" class="node-layer"></div>
+            <div id="net-alert" class="net-alert" hidden></div>
+          </div>
+        </section>
+
+        <section class="panel-block chain-block">
+          <div class="block-head">
+            <h2>THE CHAIN</h2>
+            <span class="head-meta" id="ui-chain-meta">HEIGHT 1 &middot; ALL LINKS VERIFIED</span>
+          </div>
+          <div class="chain-scroll" id="chain-scroll">
+            <div class="chain-rail" id="chain-rail"></div>
+          </div>
+        </section>
+      </div>
+
+      <!-- RIGHT: action panel -->
+      <aside class="stage-side">
+        <section class="panel-block side-block">
+          <div class="block-head">
+            <h2 id="ui-panel-title">INCOMING TRANSACTIONS</h2>
+            <span class="head-meta" id="ui-panel-meta">PHASE 1 &middot; VALIDATE</span>
+          </div>
+          <div class="panel-body" id="panel-body"></div>
+          <div class="panel-actions" id="panel-actions"></div>
+          <div class="rules-strip" id="rules-strip">
+            <span class="rules-title">ACCEPT ONLY IF</span>
+            <span class="rule"><b>SIG</b> VALID</span>
+            <span class="rule-sep">/</span>
+            <span class="rule"><b>AMT</b> &le; AVAIL</span>
+            <span class="rule-sep">/</span>
+            <span class="rule"><b>NO</b> DOUBLE SPEND</span>
+          </div>
+          <div class="event-log" id="event-log" aria-live="polite"></div>
+        </section>
+      </aside>
+    </div>
+
+    <div id="coach" class="coach" hidden></div>
+    <div id="toast-layer" class="toast-layer" aria-live="assertive"></div>
+    <div id="phase-banner" class="phase-banner" hidden></div>
+    <div id="crit-overlay" class="crit-overlay" hidden></div>
+  </main>
+
+  <!-- ============ END SCREEN ============ -->
+  <section id="screen-end" class="screen end">
+    <div class="end-inner">
+      <div class="end-top">
+        <h2 id="end-verdict" class="end-verdict">CHAIN SECURED.</h2>
+        <p id="end-title" class="end-title">CHAIN GUARDIAN</p>
+      </div>
+
+      <div class="end-grid">
+        <div class="end-stats">
+          <div class="end-stat end-stat-hero">
+            <span class="es-label">FINAL SCORE</span>
+            <span class="es-value" id="end-score">0</span>
+          </div>
+          <div class="end-stat-row">
+            <div class="end-stat"><span class="es-label">CHAIN INTEGRITY</span><span class="es-value" id="end-integrity">0%</span></div>
+            <div class="end-stat"><span class="es-label">THREATS STOPPED</span><span class="es-value" id="end-threats">0</span></div>
+            <div class="end-stat"><span class="es-label">BLOCKS VERIFIED</span><span class="es-value" id="end-blocks">0</span></div>
+            <div class="end-stat"><span class="es-label">DOUBLE SPENDS CAUGHT</span><span class="es-value" id="end-ds">0</span></div>
+            <div class="end-stat"><span class="es-label">BEST COMBO</span><span class="es-value" id="end-combo">&times;1</span></div>
+            <div class="end-stat"><span class="es-label">NODES ISOLATED</span><span class="es-value" id="end-nodes">0</span></div>
+          </div>
+          <p class="end-prompt">&ldquo;Can you beat the next validator?&rdquo;</p>
+          <button id="btn-again" class="btn btn-hero btn-hero-sm" type="button">PLAY AGAIN</button>
+        </div>
+
+        <div class="end-board">
+          <h3>TODAY&rsquo;S TOP VALIDATORS</h3>
+          <ol class="leaderboard" id="leaderboard"></ol>
+          <form class="save-row" id="save-form" autocomplete="off">
+            <label class="sr-only" for="name-input">Enter your name</label>
+            <input id="name-input" class="name-input" type="text" maxlength="12" placeholder="ENTER YOUR NAME" spellcheck="false">
+            <button class="btn btn-small" type="submit" id="btn-save">SAVE SCORE</button>
+          </form>
+          <p class="board-note" id="board-note"></p>
+        </div>
+      </div>
+
+      <footer class="end-footer">
+        <div class="ef-brand">
+          <img class="ef-logo" src="assets/logo.png" alt="Brunel Blockchain Society">
+          <div>
+            <p class="ef-name">BRUNEL BLOCKCHAIN SOCIETY</p>
+            <p class="ef-motto">LEARN. BUILD. CONNECT.</p>
+            <p class="ef-quote">&ldquo;Blockchain is only the beginning.&rdquo;</p>
+          </div>
+        </div>
+        <div class="ef-offer">
+          <p class="ef-row"><b>WORKSHOPS &amp; WEBINARS</b> &middot; PROJECTS &amp; HACKATHONS &middot; GUEST SPEAKERS &middot; NETWORKING &middot; OPPORTUNITIES</p>
+          <p class="ef-tags">AI &bull; CYBERSECURITY &bull; SOFTWARE &bull; DATA &bull; BLOCKCHAIN &bull; WEB3</p>
+          <button class="btn btn-join" id="btn-join" type="button">JOIN THE SOCIETY</button>
+        </div>
+        <div class="ef-qr">
+          <!-- The QR sits on a white plate: the code is dark-on-light, so it
+               needs the light background to scan reliably off a dark screen. -->
+          <div class="qr-box" id="qr-box">
+            <img src="assets/join-qr.png" alt="Scan to buy Brunel Blockchain Society membership">
+          </div>
+          <p class="qr-cap">SCAN TO JOIN</p>
+          <p class="qr-sub">BUY YOUR MEMBERSHIP</p>
+        </div>
+      </footer>
+    </div>
+  </section>
+
+</div>
+
+<script src="js/util.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/chain.js"></script>
+<script src="js/generator.js"></script>
+<script src="js/state.js"></script>
+<script src="js/network.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/leaderboard.js"></script>
+<script src="js/game.js"></script>
+<script src="js/tutorial.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
