@@ -6,10 +6,12 @@
 <meta name="description" content="CHAINBREAK — defend a live blockchain network. Brunel Blockchain Society.">
 
 <!-- The game loads no third-party code and makes no network requests, so it
-     can run under a strict policy. connect-src 'none' means that if anything
-     ever tries to phone home, the browser blocks it rather than trusting us.
-     (Headers a meta tag cannot set — X-Frame-Options, X-Content-Type-Options,
-     HSTS — are listed for the host in README.md.) -->
+     runs under a strict policy: connect-src 'none' means that if anything ever
+     tries to phone home, the browser blocks it rather than trusting us.
+     NOTE: frame-ancestors is deliberately absent — browsers ignore it in a
+     meta tag (it only works as a real HTTP header) and including it just logs
+     a console error. Clickjacking protection, along with the other headers a
+     meta tag cannot set, is listed for the host in README.md. -->
 <meta http-equiv="Content-Security-Policy" content="
   default-src 'none';
   script-src 'self';
@@ -19,7 +21,6 @@
   connect-src 'none';
   form-action 'none';
   base-uri 'none';
-  frame-ancestors 'none';
   object-src 'none'">
 <meta name="referrer" content="no-referrer">
 

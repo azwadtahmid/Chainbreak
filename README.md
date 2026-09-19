@@ -38,6 +38,26 @@ CB.board.clear()
 
 ---
 
+## The leaderboard
+
+**LEADERBOARD** on the start screen opens the Hall of Validators: every saved
+score, ranked, with the date and time, plus rounds played and the high score.
+The start screen also shows a running "N ROUNDS PLAYED · HIGH SCORE" line.
+
+Only **completed real rounds** are counted. The tutorial has no score and can
+never add a row — it hands off to a real round before any scoring happens, and
+`showEnd` refuses outright if the run was a demo. A score is only listed once the
+player types a name and presses SAVE SCORE, and the button disables after one
+save so a single round cannot be entered twice.
+
+**Where it is stored, honestly:** in `localStorage`, on that browser, on that
+laptop. It survives refreshes, restarts and power cuts, and there is no expiry —
+but it is *per-machine*. Two laptops at the stall keep two separate boards, and
+clearing site data clears it. A single global board shared across devices would
+need a backend, which this project deliberately does not have.
+
+---
+
 ## How a round plays
 
 120 seconds, six phases, escalating.
@@ -149,6 +169,52 @@ the laptop decode a 235 KB image to draw a 46px mark.
 it to confirm the exact destination page. To swap it, just replace `assets/join-qr.png` —
 nothing else needs changing. It sits on a white background deliberately: the code is
 dark-on-light and will not scan reliably off a dark screen without it.
+
+---
+
+## Security
+
+This is a static page. There is no server, no database, no login, no API, no
+environment variables, no secrets and no third-party code — so most of the usual
+web-app checklist has nothing to attach to here. What *does* exist has been
+tested:
+
+| Surface | Status |
+|---|---|
+| Third-party dependencies | None. No `package.json`, no `node_modules`, nothing to patch or audit. |
+| Secrets / API keys / env vars | None anywhere in the tree. Nothing reads `process.env`. |
+| Outbound network calls | None. No `fetch`, `XMLHttpRequest`, `WebSocket` or external URL in the game. |
+| XSS | The only user-typed value is the leaderboard name. It passes a character allowlist (`A-Z 0-9 _ . -`) on write **and again on read**, and renders via `textContent`. Verified by injecting `<img onerror>`, `<script>` and `<svg onload>` payloads through both the input and localStorage: nothing executed, no elements created. |
+| Untrusted storage | `localStorage` is treated as hostile input — every row is rebuilt field by field, scores clamped to a finite range, malformed entries dropped, oversized blobs rejected. |
+| Content-Security-Policy | `default-src 'none'` with `connect-src 'none'` — the page cannot load third-party code or phone home even if someone made it try. Zero violations in normal play. |
+| Path traversal (dev server) | `tools/serve.js` confines every request to its own directory. Tested against nine encoded and unencoded traversal variants with a canary file outside the root — all blocked. |
+| Exposed files | `.vercelignore` keeps `tools/` off any static deploy. `.gitignore` blocks `.env`, keys and credentials by pattern. |
+| Git history | The repository starts at this commit. Nothing sensitive has ever been in it. |
+
+**Not applicable, for the record:** admin routes, authentication, authorisation,
+rate limiting, API endpoint hardening, CORS, debug mode, database security and
+password hashing. None of these exist in a static page — the game stores no
+passwords because it has no accounts, and has no endpoints to rate-limit. If the
+project ever grows a backend, that is when this list becomes real work.
+
+### Headers to set at the host
+
+A `<meta>` tag cannot set these — the server must. On Vercel, put them in
+`vercel.json`; on Netlify, `_headers`; on GitHub Pages they are not configurable
+(which is fine for a game with no accounts and no data).
+
+```
+X-Frame-Options: DENY
+Content-Security-Policy: frame-ancestors 'none'
+X-Content-Type-Options: nosniff
+Referrer-Policy: no-referrer
+Permissions-Policy: geolocation=(), microphone=(), camera=()
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+```
+
+`frame-ancestors` is deliberately **not** in the page's meta CSP: browsers ignore
+that directive when it arrives via `<meta>` and log a console error for it. It
+belongs in a real header, alongside `X-Frame-Options`.
 
 ---
 
