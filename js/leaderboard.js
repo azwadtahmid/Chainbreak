@@ -155,6 +155,25 @@
       return row;
     },
 
+    /**
+     * Remove one entry by its row id. Returns true only if something was
+     * actually removed, so the caller can tell a real delete from a stale
+     * click on a row that has already gone.
+     *
+     * The rounds-played counter is deliberately NOT decremented: the round
+     * still happened, and saving a name was always optional, so "rounds
+     * played" is legitimately higher than "validators listed".
+     */
+    remove: function (rid) {
+      if (typeof rid !== 'string' || !rid) return false;
+      var rows = read();
+      var kept = rows.filter(function (r) { return r.rid !== rid; });
+      if (kept.length === rows.length) return false;
+      write(kept);
+      return true;
+    },
+
+    /** Wipes the board and the counters — the start-of-day reset. */
     clear: function () {
       write([]);
       writeStats({ plays: 0, best: 0 });

@@ -267,6 +267,55 @@ body{
 
 .board-foot{ display:flex; align-items:center; justify-content:space-between; gap:14px; }
 
+/* ---------- manage mode ----------
+   Editing lives behind a toggle: the stall laptop is public, and a delete
+   button beside every name is an invitation to wipe someone's score. */
+.board-manage{ display:flex; align-items:center; gap:12px; min-height:28px; }
+.board-manage .manage-hint{
+  font-family:var(--mono); font-size:8.5px; letter-spacing:.16em; color:var(--txt-faint);
+}
+.board-manage.on{
+  padding:8px 12px; border-radius:var(--r);
+  border:1px solid rgba(255,176,32,.35); background:rgba(255,176,32,.06);
+}
+.board-manage.on #btn-manage{ color:var(--warn); border-color:rgba(255,176,32,.5); }
+.btn-ghost.danger{ color:var(--bad); border-color:rgba(255,61,99,.45); margin-left:auto; }
+.btn-ghost.danger:hover{ color:#fff; border-color:var(--bad); background:rgba(255,61,99,.16); }
+
+/* per-row delete, with its confirm folded into the row itself.
+   All three controls share one height so arming a row does not make the
+   list twitch by a pixel. */
+.lb-del{ display:flex; align-items:center; gap:5px; justify-self:end; min-height:22px; }
+.del-btn,.del-yes,.del-no{
+  font-family:var(--mono); cursor:pointer; border-radius:3px;
+  border:1px solid var(--line); background:transparent; color:var(--txt-faint);
+  transition:color .15s, border-color .15s, background .15s;
+  height:22px; display:inline-flex; align-items:center; justify-content:center;
+}
+.del-btn{ font-size:11px; line-height:1; padding:0 7px; }
+.del-btn:hover{ color:var(--bad); border-color:rgba(255,61,99,.55); background:rgba(255,61,99,.1); }
+.del-yes{
+  font-size:8.5px; letter-spacing:.14em; padding:0 9px;
+  color:#ffd3dc; border-color:rgba(255,61,99,.6); background:rgba(255,61,99,.16);
+}
+.del-yes:hover{ background:rgba(255,61,99,.34); color:#fff; }
+.del-no{ font-size:10px; line-height:1; padding:0 7px; }
+.del-no:hover{ color:var(--txt); border-color:var(--txt-faint); }
+.del-btn:focus-visible,.del-yes:focus-visible,.del-no:focus-visible{
+  outline:2px solid var(--cy); outline-offset:2px;
+}
+
+/* swap the ✕ for the confirm pair once a row is armed */
+.del-yes,.del-no{ display:none; }
+.leaderboard-full li.arming .del-btn{ display:none; }
+.leaderboard-full li.arming .del-yes,
+.leaderboard-full li.arming .del-no{ display:inline-flex; }
+.leaderboard-full li.arming{ border-color:rgba(255,61,99,.6); background:rgba(255,61,99,.09); }
+.leaderboard-full li.arming .lb-name{ color:var(--bad); text-decoration:line-through; }
+
+.leaderboard.leaderboard-full.manage li{ grid-template-columns:28px 1fr auto auto auto; }
+.leaderboard.leaderboard-full.manage li.empty{ grid-template-columns:1fr; }
+
 /* ============================================================
    ONBOARDING
    ============================================================ */

@@ -56,6 +56,29 @@ but it is *per-machine*. Two laptops at the stall keep two separate boards, and
 clearing site data clears it. A single global board shared across devices would
 need a backend, which this project deliberately does not have.
 
+### Removing entries
+
+Press **MANAGE** on the Hall of Validators. A **✕** appears beside every name:
+
+- **Delete one** — click ✕ and that row turns red, offering **DELETE** / **✕**.
+  Click DELETE to remove it, or ✕ to back out. Nothing is removed on the first
+  click, so a misclick costs nothing.
+- **Delete everything** — **CLEAR ALL** also takes two clicks: the first arms it
+  and the button changes to "CONFIRM · WIPE ALL n". It disarms itself after four
+  seconds if you walk away. This one also resets the rounds-played and high-score
+  counters — it is the start-of-day reset.
+- **Escape** backs out one level at a time: armed row → manage mode → the board.
+
+Deleting a name does **not** reduce ROUNDS PLAYED. The round still happened, and
+entering a name was always optional, so "rounds played" is legitimately higher
+than "validators listed".
+
+Manage mode is off every time the board opens and never persists. The controls
+sit behind a toggle deliberately: a delete button next to every name on an
+unattended stall laptop is an invitation to wipe someone's score for a laugh.
+There is no password on it — anyone at the keyboard can still get in, so it
+guards against mischief and misclicks, not against a determined person.
+
 ---
 
 ## How a round plays

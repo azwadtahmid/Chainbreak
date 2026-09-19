@@ -142,8 +142,10 @@
    * Render a list of rows. Names go in via textContent (el's third
    * argument), never innerHTML — a stored name can never become markup.
    */
-  function renderRows(ol, list, highlightId, withDate) {
+  function renderRows(ol, list, opts) {
+    opts = opts || {};
     U.clear(ol);
+    ol.classList.toggle('manage', !!opts.manage);
 
     if (!list.length) {
       ol.appendChild(el('li', 'empty', 'NO SCORES YET · BE THE FIRST VALIDATOR'));
@@ -151,13 +153,85 @@
     }
 
     list.forEach(function (row, i) {
-      var li = el('li', highlightId && row.rid === highlightId ? 'me' : '');
+      var li = el('li', opts.highlightId && row.rid === opts.highlightId ? 'me' : '');
       li.appendChild(el('span', 'lb-rank', (i + 1) + '.'));
       li.appendChild(el('span', 'lb-name', row.name));
-      if (withDate) li.appendChild(el('span', 'lb-when', formatWhen(row.at)));
+      if (opts.withDate) li.appendChild(el('span', 'lb-when', formatWhen(row.at)));
       li.appendChild(el('span', 'lb-score', U.commas(row.score)));
+      if (opts.manage) li.appendChild(deleteControl(row, li));
       ol.appendChild(li);
     });
+  }
+
+  /**
+   * Per-row delete, with the confirm built into the row itself: one click
+   * arms it, a second confirms. No modal, no browser confirm() — and an
+   * accidental click is undone by clicking anywhere else.
+   */
+  function deleteControl(row, li) {
+    var wrap = el('span', 'lb-del');
+
+    var del = el('button', 'del-btn', '✕');
+    del.type = 'button';
+    del.title = 'Remove ' + row.name;
+    del.setAttribute('aria-label', 'Remove ' + row.name + ' from the leaderboard');
+
+    var yes = el('button', 'del-yes', 'DELETE');
+    yes.type = 'button';
+    var no = el('button', 'del-no', '✕');
+    no.type = 'button';
+    no.title = 'Keep';
+
+    function disarm() {
+      li.classList.remove('arming');
+      armedRow = null;
+    }
+
+    del.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (armedRow && armedRow !== disarm) armedRow();
+      li.classList.add('arming');
+      armedRow = disarm;
+      A.play('ui');
+    });
+
+    no.addEventListener('click', function (e) { e.stopPropagation(); disarm(); A.play('ui'); });
+
+    yes.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var removed = CB.board.remove(row.rid);
+      A.play(removed ? 'reject' : 'error');
+      armedRow = null;
+      showFullBoard();           // re-rank and refresh the totals
+      flashBoardNote(removed
+        ? row.name + ' REMOVED FROM THE BOARD'
+        : 'THAT ENTRY WAS ALREADY GONE');
+    });
+
+    wrap.appendChild(del);
+    wrap.appendChild(yes);
+    wrap.appendChild(no);
+    return wrap;
+  }
+
+  var armedRow = null;
+
+  function flashBoardNote(text) {
+    var note = $('#board-storage-note');
+    if (!note) return;
+    note.className = 'board-note ok';
+    note.textContent = text;
+    clearTimeout(note._t);
+    note._t = setTimeout(function () { setStorageNote(); }, 2600);
+  }
+
+  function setStorageNote() {
+    var note = $('#board-storage-note');
+    if (!note) return;
+    note.className = 'board-note';
+    note.textContent = CB.board.isPersistent()
+      ? 'SAVED ON THIS LAPTOP · SURVIVES RESTARTS'
+      : 'STORAGE UNAVAILABLE · THIS SESSION ONLY';
   }
 
   function formatWhen(ts) {
@@ -169,9 +243,12 @@
     } catch (e) { return ''; }
   }
 
+  /** The compact board on the end screen. Never manageable mid-flow. */
   function renderBoard(highlightId) {
-    renderRows($('#leaderboard'), CB.board.list(), highlightId, false);
+    renderRows($('#leaderboard'), CB.board.list(), { highlightId: highlightId });
   }
+
+  var manageMode = false;
 
   /** The full-screen Hall of Validators, reachable from the start screen. */
   function showFullBoard() {
@@ -191,15 +268,75 @@
       totals.appendChild(b);
     });
 
-    renderRows($('#leaderboard-full'), rows, null, true);
+    renderRows($('#leaderboard-full'), rows, { withDate: true, manage: manageMode });
 
-    var note = $('#board-storage-note');
-    note.className = 'board-note';
-    note.textContent = CB.board.isPersistent()
-      ? 'SAVED ON THIS LAPTOP · SURVIVES RESTARTS'
-      : 'STORAGE UNAVAILABLE · THIS SESSION ONLY';
-
+    armedRow = null;
+    renderManageBar(rows.length);
+    setStorageNote();
     show('board');
+  }
+
+  /**
+   * Editing controls live behind a MANAGE toggle rather than sitting on the
+   * board: the stall laptop is public, and a delete button next to every
+   * name is an invitation to wipe someone's score for a laugh.
+   */
+  function renderManageBar(rowCount) {
+    var bar = $('#board-manage');
+    U.clear(bar);
+    bar.classList.toggle('on', manageMode);
+
+    var toggle = el('button', 'btn-ghost', manageMode ? 'DONE' : 'MANAGE');
+    toggle.type = 'button';
+    toggle.id = 'btn-manage';
+    toggle.addEventListener('click', function () {
+      manageMode = !manageMode;
+      clearAllArmed = false;
+      A.play('ui');
+      showFullBoard();
+    });
+    bar.appendChild(toggle);
+
+    if (!manageMode) return;
+
+    bar.appendChild(el('span', 'manage-hint',
+      rowCount ? 'CLICK ✕ NEXT TO A NAME TO REMOVE IT' : 'NOTHING TO REMOVE'));
+
+    if (!rowCount) return;
+
+    var clearBtn = el('button', 'btn-ghost danger',
+      clearAllArmed ? 'CONFIRM · WIPE ALL ' + rowCount : 'CLEAR ALL');
+    clearBtn.type = 'button';
+    clearBtn.addEventListener('click', function () {
+      if (!clearAllArmed) {
+        clearAllArmed = true;
+        A.play('warn');
+        renderManageBar(rowCount);
+        clearTimeout(clearAllArmed._t);
+        setTimeout(function () {
+          if (clearAllArmed) { clearAllArmed = false; renderManageBar(rowCount); }
+        }, 4000);
+        return;
+      }
+      clearAllArmed = false;
+      CB.board.clear();
+      A.play('error');
+      showFullBoard();
+      flashBoardNote('LEADERBOARD CLEARED · SCORES AND COUNTERS RESET');
+    });
+    bar.appendChild(clearBtn);
+  }
+
+  var clearAllArmed = false;
+
+  /** Leave the board; manage mode never persists to the next visit. */
+  function leaveBoard() {
+    manageMode = false;
+    clearAllArmed = false;
+    armedRow = null;
+    A.play('ui');
+    refreshStartPlays();
+    show('start');
   }
 
   function refreshStartPlays() {
@@ -233,11 +370,7 @@
     U.on($('#btn-start'), 'click', beginRun);
     U.on($('#btn-demo'), 'click', beginTutorial);
     U.on($('#btn-board'), 'click', function () { A.play('ui'); showFullBoard(); });
-    U.on($('#btn-board-back'), 'click', function () {
-      A.play('ui');
-      refreshStartPlays();
-      show('start');
-    });
+    U.on($('#btn-board-back'), 'click', leaveBoard);
     refreshStartPlays();
     U.on($('#btn-again'), 'click', function () {
       A.play('ui');
@@ -312,11 +445,16 @@
         return;
       }
       if (screens.board.classList.contains('is-active')) {
+        // Escape backs out one level: an armed row, then manage mode,
+        // then the board itself.
+        if (k === 'escape' && armedRow) { e.preventDefault(); armedRow(); return; }
+        if (k === 'escape' && manageMode) {
+          e.preventDefault(); manageMode = false; clearAllArmed = false;
+          A.play('ui'); showFullBoard(); return;
+        }
         if (k === 'escape' || k === 'enter' || k === ' ' || k === 'l') {
           e.preventDefault();
-          A.play('ui');
-          refreshStartPlays();
-          show('start');
+          leaveBoard();
         }
         return;
       }
