@@ -73,11 +73,26 @@ Use **Chrome or Edge**. Safari's MediaRecorder support for WebM is unreliable.
 Both platforms prefer MP4, and MediaRecorder's WebM has no duration header (some
 uploaders show it as 0:00 until it is remuxed). One command fixes both:
 
+ffmpeg is already installed on this machine (`winget install Gyan.FFmpeg`). The
+command below is the one that produced the delivered files — `-fflags +genpts`
+is what rebuilds the missing timestamps, and `-r` forces a constant frame rate
+so the uploaders accept it:
+
 ```bash
-ffmpeg -i chainbreak-trailer-1080x1920.webm -c:v libx264 -preset slow -crf 20 -pix_fmt yuv420p -c:a aac -b:a 192k -movflags +faststart chainbreak-trailer.mp4
+ffmpeg -y -fflags +genpts -i chainbreak-trailer-1080x1920.webm -c:v libx264 -preset slow -crf 20 -pix_fmt yuv420p -profile:v high -level 4.2 -r 30 -c:a aac -b:a 192k -ar 48000 -movflags +faststart chainbreak-trailer.mp4
 ```
 
+Swap `-r 30` for `-r 60` to keep the rapid cuts in the climax smoother — the
+recorder captures at roughly 57 fps, so there are real frames to keep.
+
 No ffmpeg? https://cloudconvert.com/webm-to-mp4 does the same job in a browser.
+
+**Sanity-check any re-encode** by confirming the frame count is real rather than
+duplicated padding:
+
+```bash
+ffprobe -v error -select_streams v:0 -count_frames -show_entries stream=nb_read_frames -of default=noprint_wrappers=1 chainbreak-trailer-1080x1920.webm
+```
 
 ### If recording gives you trouble
 
