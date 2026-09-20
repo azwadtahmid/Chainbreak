@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="CHAINBREAK — cinematic trailer. Brunel Blockchain Society.">
+<title>CHAINBREAK — Trailer</title>
+<link rel="icon" href="../assets/logo-mark.png" type="image/png">
+<style>
+  :root{
+    --bg:#04070c; --line:#17283d; --cy:#00e5ff; --dim:#7b93ad; --faint:#4a6180;
+    --mono:"JetBrains Mono","SF Mono","Cascadia Mono",Consolas,"Roboto Mono",ui-monospace,monospace;
+  }
+  *,*::before,*::after{ box-sizing:border-box; }
+  html,body{ height:100%; margin:0; background:#000; color:#d7e6f5; font-family:var(--mono); }
+  body{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:16px; }
+
+  /* 9:16 stage, scaled to whatever height is available */
+  #stage{
+    position:relative; height:min(86vh, 1100px); aspect-ratio:9/16;
+    border:1px solid var(--line); border-radius:6px; overflow:hidden;
+    box-shadow:0 0 70px rgba(0,229,255,.12);
+    background:#000;
+  }
+  canvas{ width:100%; height:100%; display:block; }
+
+  #overlay{
+    position:absolute; inset:0; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:18px;
+    background:radial-gradient(ellipse at 50% 45%, rgba(10,22,38,.92), rgba(0,0,0,.96));
+    cursor:pointer; transition:opacity .3s;
+  }
+  #overlay.hidden{ opacity:0; pointer-events:none; }
+  #overlay img{ width:150px; filter:drop-shadow(0 0 24px rgba(0,229,255,.45)); }
+  #overlay .big{ font-size:22px; letter-spacing:.34em; color:#eafcff; text-indent:.34em; }
+  #overlay .sub{ font-size:11px; letter-spacing:.2em; color:var(--faint); }
+
+  .bar{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:center; max-width:min(96vw,760px); }
+  button{
+    font-family:var(--mono); font-size:11px; letter-spacing:.16em; font-weight:700;
+    background:linear-gradient(180deg, rgba(0,229,255,.14), rgba(0,229,255,.04));
+    border:1px solid var(--line); color:#eafcff; border-radius:4px;
+    padding:10px 16px; cursor:pointer; transition:border-color .2s, box-shadow .2s;
+  }
+  button:hover{ border-color:var(--cy); box-shadow:0 0 20px rgba(0,229,255,.28); }
+  button[disabled]{ opacity:.4; cursor:not-allowed; box-shadow:none; }
+  button.rec{ border-color:rgba(255,61,99,.5); color:#ffd3dc; }
+  button.rec:hover{ border-color:#ff3d63; box-shadow:0 0 20px rgba(255,61,99,.3); }
+
+  #time{ font-size:11px; letter-spacing:.14em; color:var(--faint); min-width:96px; text-align:center; }
+  #status{ font-size:10px; letter-spacing:.14em; color:var(--faint); min-height:14px; text-align:center; max-width:min(96vw,760px); }
+  #status.on{ color:var(--cy); }
+  #status.rec{ color:#ff3d63; }
+  #scrub{ width:min(92vw,520px); accent-color:var(--cy); }
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <canvas id="c" width="1080" height="1920"></canvas>
+  <div id="overlay">
+    <img src="../assets/logo.png" alt="Brunel Blockchain Society">
+    <div class="big">CHAINBREAK</div>
+    <div class="sub">TAP TO PLAY WITH SOUND</div>
+  </div>
+</div>
+
+<div class="bar">
+  <button id="play">▶ PLAY</button>
+  <button id="restart">↻ RESTART</button>
+  <span id="time">0.0 / 58.0s</span>
+  <button id="mute">♪ SOUND ON</button>
+  <button id="record" class="rec">● RECORD VIDEO</button>
+</div>
+<input id="scrub" type="range" min="0" max="58" step="0.1" value="0">
+<div id="status"></div>
+
+<script src="engine.js"></script>
+<script src="score.js"></script>
+<script src="timeline.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var canvas = document.getElementById('c');
+  var ctx = canvas.getContext('2d', { alpha: false });
+  var overlay = document.getElementById('overlay');
+  var playBtn = document.getElementById('play');
+  var restartBtn = document.getElementById('restart');
+  var muteBtn = document.getElementById('mute');
+  var recBtn = document.getElementById('record');
+  var timeEl = document.getElementById('time');
+  var statusEl = document.getElementById('status');
+  var scrub = document.getElementById('scrub');
+
+  var DUR = Timeline.DURATION;
+  var playing = false, t = 0, last = 0, raf = 0, muted = false;
+  var recorder = null, chunks = [], recTrack = null, recT0 = 0;
+
+  scrub.max = DUR;
+
+  function status(msg, cls) {
+    statusEl.textContent = msg || '';
+    statusEl.className = cls || '';
+  }
+
+  function reset() {
+    t = 0; last = 0;
+    Timeline.reset();
+    Score.reset();
+    draw(0, 0);
+  }
+
+  function draw(time, dt) {
+    Timeline.draw(ctx, time, dt);
+    timeEl.textContent = time.toFixed(1) + ' / ' + DUR.toFixed(1) + 's';
+    scrub.value = Math.min(time, DUR);
+  }
+
+  function frame(now) {
+    if (!playing) return;
+    if (!last) last = now;
+    var dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+
+    // While recording, the AUDIO CLOCK is the master so picture and score
+    // can never drift apart, whatever frame rate the machine manages.
+    if (recTrack && Score.context()) {
+      var at = Score.context().currentTime - recT0;
+      dt = Math.max(0.001, Math.min(0.1, at - t));
+      t = at;
+    } else {
+      t += dt;
+    }
+
+    if (t >= DUR) {
+      t = DUR;
+      draw(t, dt);
+      if (recTrack) pushFrame();
+      stop();
+      if (recorder && recorder.state === 'recording') finishRecording();
+      return;
+    }
+    draw(t, dt);
+    if (recTrack) pushFrame();
+    raf = requestAnimationFrame(frame);
+  }
+
+  /**
+   * Hand the freshly drawn frame to the recorder explicitly. Relying on the
+   * compositor to sample the canvas means a window that is hidden, minimised
+   * or partly covered records nothing at all — this guarantees every frame
+   * we draw is a frame that lands in the file.
+   */
+  function pushFrame() {
+    try { if (recTrack.requestFrame) recTrack.requestFrame(); } catch (e) {}
+  }
+
+  function start() {
+    if (playing) return;
+    if (t >= DUR - 0.01) { reset(); }
+    overlay.classList.add('hidden');
+    var scoreT0 = Score.start();
+    if (recTrack) recT0 = scoreT0;   // lock picture to the score's own clock
+    Score.setMuted(recTrack ? false : muted);
+    playing = true;
+    last = 0;
+    playBtn.textContent = '❚❚ PAUSE';
+    raf = requestAnimationFrame(frame);
+  }
+
+  function stop() {
+    playing = false;
+    cancelAnimationFrame(raf);
+    playBtn.textContent = '▶ PLAY';
+  }
+
+  playBtn.addEventListener('click', function () { playing ? stop() : start(); });
+  overlay.addEventListener('click', start);
+
+  restartBtn.addEventListener('click', function () {
+    stop(); reset(); status('');
+  });
+
+  muteBtn.addEventListener('click', function () {
+    muted = !muted;
+    Score.setMuted(muted);
+    muteBtn.textContent = muted ? '✕ SOUND OFF' : '♪ SOUND ON';
+  });
+
+  scrub.addEventListener('input', function () {
+    stop();
+    // scrubbing replays the visuals deterministically from a clean state
+    Timeline.reset();
+    t = parseFloat(scrub.value);
+    draw(t, 0.016);
+  });
+
+  /* ------------------------------------------------------------
+     VIDEO EXPORT
+     Records the canvas and the synthesised score into one WebM file.
+     ------------------------------------------------------------ */
+  function pickMime() {
+    var candidates = [
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp8,opus',
+      'video/webm'
+    ];
+    for (var i = 0; i < candidates.length; i++) {
+      if (window.MediaRecorder && MediaRecorder.isTypeSupported(candidates[i])) return candidates[i];
+    }
+    return null;
+  }
+
+  function finishRecording() {
+    if (recorder && recorder.state !== 'inactive') recorder.stop();
+  }
+
+  recBtn.addEventListener('click', function () {
+    if (!window.MediaRecorder) {
+      status('THIS BROWSER CANNOT RECORD — USE CHROME OR EDGE, OR SCREEN-RECORD INSTEAD', 'rec');
+      return;
+    }
+    var mime = pickMime();
+    if (!mime) {
+      status('NO SUPPORTED VIDEO CODEC — SCREEN-RECORD INSTEAD', 'rec');
+      return;
+    }
+
+    stop(); reset();
+    Score.init();
+    Score.setMuted(false);            // the recording needs audio even if you muted playback
+
+    // captureStream(0) = manual frame control; see pushFrame()
+    var vStream = canvas.captureStream(0);
+    var aStream = Score.stream();
+    recTrack = vStream.getVideoTracks()[0];
+    var tracks = vStream.getVideoTracks();
+    if (aStream) tracks = tracks.concat(aStream.getAudioTracks());
+    var mixed = new MediaStream(tracks);
+
+    chunks = [];
+    recorder = new MediaRecorder(mixed, { mimeType: mime, videoBitsPerSecond: 10000000 });
+    recorder.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+    recorder.onstop = function () {
+      var blob = new Blob(chunks, { type: mime.split(';')[0] });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'chainbreak-trailer-1080x1920.webm';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+      status('SAVED — ' + (blob.size / 1048576).toFixed(1) + ' MB. CONVERT TO MP4 FOR INSTAGRAM (SEE README).', 'on');
+      recBtn.disabled = false;
+      recBtn.textContent = '● RECORD VIDEO';
+      recTrack = null;
+      Score.setMuted(muted);
+    };
+
+    recorder.start(250);
+    recBtn.disabled = true;
+    recBtn.textContent = '● RECORDING…';
+    status('RECORDING — LEAVE THIS TAB VISIBLE FOR 58 SECONDS. DO NOT SWITCH AWAY.', 'rec');
+    start();
+  });
+
+  /* keyboard */
+  window.addEventListener('keydown', function (e) {
+    if (e.target.tagName === 'INPUT') return;
+    if (e.key === ' ') { e.preventDefault(); playing ? stop() : start(); }
+    if (e.key.toLowerCase() === 'r') { stop(); reset(); }
+    if (e.key.toLowerCase() === 'm') { muteBtn.click(); }
+  });
+
+  reset();
+  status('58 SECONDS · 1080×1920 · ORIGINAL SCORE');
+})();
+</script>
+</body>
+</html>
