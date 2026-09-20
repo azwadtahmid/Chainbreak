@@ -19,9 +19,12 @@
     var AC = root.AudioContext || root.webkitAudioContext;
     ctx = new AC();
     master = ctx.createGain();
-    master.gain.value = 0.9;
+    // 0.62 not 0.9: on the biggest hits several instruments land on the same
+    // sample and the sum was peaking above 0 dBFS, which clips. The loudness
+    // comes back from the compressor below, without the distortion.
+    master.gain.value = 0.62;
 
-    // gentle bus compression so the drops hit without clipping
+    // bus compression so the drops hit hard without clipping
     var comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -14;
     comp.knee.value = 24;
@@ -39,7 +42,7 @@
 
   Score.stream = function () { return dest ? dest.stream : null; };
   Score.context = function () { return ctx; };
-  Score.setMuted = function (m) { if (master) master.gain.value = m ? 0 : 0.9; };
+  Score.setMuted = function (m) { if (master) master.gain.value = m ? 0 : 0.62; };
 
   /* ------------------------------------------------------------
      INSTRUMENTS
@@ -330,16 +333,181 @@
     stab(at(57.05), 98, 0.42, 1.2);
   }
 
+  /* ------------------------------------------------------------
+     THE 30-SECOND ARRANGEMENT (Reels / TikTok)
+     Not the long score truncated — a separate cue sheet written to
+     the short cut's beats, so the drop still lands on the 51% attack
+     and the final impact still lands on the logotype.
+     ------------------------------------------------------------ */
+  function arrange30(t0) {
+    var at = function (s) { return t0 + s; };
+    var i;
+
+    /* ---- 0-3.4  OPENING, compressed ---- */
+    drone(at(0.1), 3.5, 34, 0.30);
+    for (i = 0; i < 8; i++) tick(at(0.25 + i * 0.36), 0.18 + i * 0.02);
+    blip(at(0.8), 1320, 0.14);
+    stab(at(0.95), 110, 0.18, 0.4);         // ONE NETWORK.
+    stab(at(1.85), 130, 0.22, 0.4);         // ONE CHAIN.
+    stab(at(2.75), 146, 0.28, 0.4);         // ONE WEAK LINK.
+    boom(at(3.32), 1.0, 150);
+
+    /* ---- 3.55-6.3  THE NETWORK ---- */
+    drone(at(3.6), 2.9, 44, 0.24);
+    for (i = 0; i < 11; i++) kick(at(3.6 + i * 0.25), 0.4 + i * 0.02);
+    stab(at(5.05), 164, 0.34, 0.6);         // UNDER ATTACK
+    boom(at(5.05), 0.55, 115);
+
+    /* ---- 6.3-11.0  DOUBLE SPEND (the hook) ---- */
+    drone(at(6.3), 4.9, 49, 0.26);
+    for (i = 0; i < 24; i++) kick(at(6.3 + i * 0.2), i % 2 ? 0.34 : 0.56);
+    for (i = 0; i < 12; i++) snare(at(6.5 + i * 0.4), 0.3);
+    glitchNoise(at(6.35), 0.32);
+    boom(at(6.35), 0.78, 130);              // DOUBLE SPEND DETECTED
+    stab(at(6.4), 155, 0.44, 0.9);
+    stab(at(9.35), 233, 0.46, 0.3);         // REJECTED / SECURED
+    boom(at(9.35), 0.55, 120);
+
+    /* ---- 11.0-14.3  THE CHAIN BREAKS ---- */
+    drone(at(11.0), 3.5, 46, 0.30);
+    for (i = 0; i < 17; i++) kick(at(11.0 + i * 0.2), i % 4 === 0 ? 0.62 : 0.32);
+    for (i = 0; i < 4; i++) glitchNoise(at(11.1 + i * 0.3), 0.24);
+    boom(at(11.1), 0.8, 96);                // CHAIN INTEGRITY FAILURE
+    stab(at(11.15), 138, 0.42, 1.0);
+    for (i = 0; i < 4; i++) stab(at(12.1 + i * 0.28), 175 + i * 24, 0.3, 0.18);
+    boom(at(13.5), 0.6, 140);               // isolated / restored
+
+    /* ---- 14.3-18.0  THE NETWORK TURNS + build ---- */
+    drone(at(14.3), 4.0, 55, 0.3);
+    for (i = 0; i < 22; i++) kick(at(14.3 + i * 0.17), 0.44 + i * 0.01);
+    stab(at(14.5), 146, 0.4, 0.4);
+    stab(at(15.4), 168, 0.44, 0.4);
+    stab(at(16.3), 190, 0.48, 0.4);
+    boom(at(16.75), 0.6, 120);              // PEER ISOLATED
+    riser(at(15.6), 2.6, 0.42);
+    for (i = 0; i < 22; i++) {
+      var f = i / 22;
+      snare(at(15.7 + Math.pow(f, 1.7) * 2.5), 0.22 + f * 0.44);
+    }
+
+    /* ---- 18.35-25.6  THE DROP ---- */
+    boom(at(18.35), 1.3, 180);
+    glitchNoise(at(18.35), 0.6);
+    stab(at(18.4), 87, 0.62, 1.5);
+    drone(at(18.4), 7.3, 33, 0.40);
+    for (i = 0; i < 32; i++) bassline(at(18.4 + i * 0.22), 0.2, i % 4 === 0 ? 58 : (i % 4 === 2 ? 69 : 65), 0.4);
+    for (i = 0; i < 38; i++) kick(at(18.4 + i * 0.19), i % 2 === 0 ? 0.88 : 0.46);
+    for (i = 0; i < 19; i++) snare(at(18.6 + i * 0.38), 0.44);
+    boom(at(20.3), 0.75, 150);              // 72%
+    boom(at(21.8), 0.82, 140);              // 58%
+    boom(at(23.3), 0.9, 130);               // 43%
+    for (i = 0; i < 8; i++) glitchNoise(at(20.4 + i * 0.5), 0.2);
+    riser(at(23.3), 1.9, 0.46);
+    boom(at(25.25), 1.3, 200);              // CHAIN HELD
+    stab(at(25.3), 98, 0.62, 1.2);
+
+    /* ---- 25.6-26.1 silence, then the logotype ---- */
+    blip(at(25.95), 1568, 0.26);
+    boom(at(26.2), 1.35, 190);              // CHAINBREAK
+    pad(at(26.2), 3.8, 261.63, 0.14);
+    stab(at(26.25), 65.4, 0.5, 2.0);
+    drone(at(26.3), 3.6, 43, 0.26);
+    boom(at(28.0), 0.5, 120);               // society line
+    boom(at(29.15), 1.0, 150);              // final CTA hit
+    stab(at(29.2), 98, 0.44, 1.0);
+  }
+
   var t0 = 0;
 
-  /** Schedule the whole score. Call once, when playback starts. */
-  Score.start = function () {
+  /**
+   * Render the score to an AudioBuffer without playing it.
+   *
+   * OfflineAudioContext runs as fast as the CPU allows and does not depend
+   * on the page being visible or on animation frames, so this is the
+   * reliable way to get the music out — real-time capture stalls the moment
+   * a browser decides the tab is in the background.
+   */
+  Score.renderOffline = function (variant, seconds, sampleRate) {
+    var OAC = root.OfflineAudioContext || root.webkitOfflineAudioContext;
+    if (!OAC) return Promise.reject(new Error('OfflineAudioContext unavailable'));
+
+    var sr = sampleRate || 48000;
+    var off = new OAC(2, Math.ceil(seconds * sr), sr);
+
+    // The instruments close over the module's ctx/master, so point those at
+    // the offline graph for the duration of the render, then put them back.
+    var realCtx = ctx, realMaster = master, realDest = dest;
+    ctx = off;
+    master = off.createGain();
+    master.gain.value = 0.62;
+    var comp = off.createDynamicsCompressor();
+    comp.threshold.value = -14; comp.knee.value = 24; comp.ratio.value = 7;
+    comp.attack.value = 0.004; comp.release.value = 0.22;
+    master.connect(comp); comp.connect(off.destination);
+    dest = null;
+
+    (variant === 'reel' ? arrange30 : arrange)(0.05);
+
+    return off.startRendering().then(function (buf) {
+      ctx = realCtx; master = realMaster; dest = realDest;
+
+      // Safety net: scale to -1 dBFS if anything still peaks over. Writing a
+      // buffer that exceeds +/-1 to 16-bit PCM hard-clips it audibly.
+      var peak = 0, c, i, d;
+      for (c = 0; c < buf.numberOfChannels; c++) {
+        d = buf.getChannelData(c);
+        for (i = 0; i < d.length; i++) { var a = Math.abs(d[i]); if (a > peak) peak = a; }
+      }
+      if (peak > 0.891) {
+        var k = 0.891 / peak;
+        for (c = 0; c < buf.numberOfChannels; c++) {
+          d = buf.getChannelData(c);
+          for (i = 0; i < d.length; i++) d[i] *= k;
+        }
+      }
+      return buf;
+    }, function (e) {
+      ctx = realCtx; master = realMaster; dest = realDest;
+      throw e;
+    });
+  };
+
+  /** AudioBuffer -> 16-bit PCM WAV, so it can be written straight to disk. */
+  Score.toWav = function (buf) {
+    var chs = buf.numberOfChannels, len = buf.length;
+    var data = new DataView(new ArrayBuffer(44 + len * chs * 2));
+    var w = function (off, str) { for (var i = 0; i < str.length; i++) data.setUint8(off + i, str.charCodeAt(i)); };
+    w(0, 'RIFF'); data.setUint32(4, 36 + len * chs * 2, true); w(8, 'WAVE');
+    w(12, 'fmt '); data.setUint32(16, 16, true); data.setUint16(20, 1, true);
+    data.setUint16(22, chs, true); data.setUint32(24, buf.sampleRate, true);
+    data.setUint32(28, buf.sampleRate * chs * 2, true);
+    data.setUint16(32, chs * 2, true); data.setUint16(34, 16, true);
+    w(36, 'data'); data.setUint32(40, len * chs * 2, true);
+
+    var chans = [], c;
+    for (c = 0; c < chs; c++) chans.push(buf.getChannelData(c));
+    var off = 44;
+    for (var i = 0; i < len; i++) {
+      for (c = 0; c < chs; c++) {
+        var s = Math.max(-1, Math.min(1, chans[c][i]));
+        data.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+        off += 2;
+      }
+    }
+    return new Blob([data.buffer], { type: 'audio/wav' });
+  };
+
+  /**
+   * Schedule the score. `variant` picks the cue sheet:
+   * undefined / 'full' = the 58s trailer, 'reel' = the 30s cut.
+   */
+  Score.start = function (variant) {
     Score.init();
     if (ctx.state === 'suspended') ctx.resume();
     if (started) return t0;
     started = true;
     t0 = ctx.currentTime + 0.12;
-    arrange(t0);
+    (variant === 'reel' ? arrange30 : arrange)(t0);
     return t0;
   };
 

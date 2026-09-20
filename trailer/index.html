@@ -52,6 +52,8 @@
   #status.on{ color:var(--cy); }
   #status.rec{ color:#ff3d63; }
   #scrub{ width:min(92vw,520px); accent-color:var(--cy); }
+  button.cut{ background:transparent; color:var(--faint); }
+  button.cut.on{ border-color:var(--cy); color:#eafcff; background:linear-gradient(180deg, rgba(0,229,255,.18), rgba(0,229,255,.05)); }
 </style>
 </head>
 <body>
@@ -72,12 +74,17 @@
   <button id="mute">♪ SOUND ON</button>
   <button id="record" class="rec">● RECORD VIDEO</button>
 </div>
+<div class="bar">
+  <button id="cut-full" class="cut on">58s TRAILER</button>
+  <button id="cut-reel" class="cut">30s REEL</button>
+</div>
 <input id="scrub" type="range" min="0" max="58" step="0.1" value="0">
 <div id="status"></div>
 
 <script src="engine.js"></script>
 <script src="score.js"></script>
 <script src="timeline.js"></script>
+<script src="cut30.js"></script>
 <script>
 (function () {
   'use strict';
@@ -93,7 +100,15 @@
   var statusEl = document.getElementById('status');
   var scrub = document.getElementById('scrub');
 
-  var DUR = Timeline.DURATION;
+  // which cut is loaded: the full trailer or the 30s reel
+  var CUTS = {
+    full: { tl: Timeline,   variant: 'full', label: '58 SECONDS · 1080×1920 · ORIGINAL SCORE' },
+    reel: { tl: Timeline30, variant: 'reel', label: '30 SECONDS · 1080×1920 · RE-CUT FOR REELS' }
+  };
+  var cutName = (location.search.match(/cut=(\w+)/) || [])[1] === '30' ? 'reel' : 'full';
+  var CUT = CUTS[cutName];
+  var TL = CUT.tl;
+  var DUR = TL.DURATION;
   var playing = false, t = 0, last = 0, raf = 0, muted = false;
   var recorder = null, chunks = [], recTrack = null, recT0 = 0;
 
@@ -106,13 +121,13 @@
 
   function reset() {
     t = 0; last = 0;
-    Timeline.reset();
+    TL.reset();
     Score.reset();
     draw(0, 0);
   }
 
   function draw(time, dt) {
-    Timeline.draw(ctx, time, dt);
+    TL.draw(ctx, time, dt);
     timeEl.textContent = time.toFixed(1) + ' / ' + DUR.toFixed(1) + 's';
     scrub.value = Math.min(time, DUR);
   }
@@ -152,7 +167,9 @@
    * or partly covered records nothing at all — this guarantees every frame
    * we draw is a frame that lands in the file.
    */
+  var recFrames = 0;
   function pushFrame() {
+    recFrames++;
     try { if (recTrack.requestFrame) recTrack.requestFrame(); } catch (e) {}
   }
 
@@ -160,7 +177,7 @@
     if (playing) return;
     if (t >= DUR - 0.01) { reset(); }
     overlay.classList.add('hidden');
-    var scoreT0 = Score.start();
+    var scoreT0 = Score.start(CUT.variant);
     if (recTrack) recT0 = scoreT0;   // lock picture to the score's own clock
     Score.setMuted(recTrack ? false : muted);
     playing = true;
@@ -191,7 +208,7 @@
   scrub.addEventListener('input', function () {
     stop();
     // scrubbing replays the visuals deterministically from a clean state
-    Timeline.reset();
+    TL.reset();
     t = parseFloat(scrub.value);
     draw(t, 0.016);
   });
@@ -247,20 +264,33 @@
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
       a.href = url;
-      a.download = 'chainbreak-trailer-1080x1920.webm';
+      a.download = cutName === 'reel'
+        ? 'chainbreak-reel-30s-1080x1920.webm'
+        : 'chainbreak-trailer-1080x1920.webm';
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
-      status('SAVED — ' + (blob.size / 1048576).toFixed(1) + ' MB. CONVERT TO MP4 FOR INSTAGRAM (SEE README).', 'on');
+      var fps = recFrames / DUR;
+      if (fps < 20) {
+        // A browser stops rendering a tab you switch away from, which
+        // freezes the capture. Say so rather than handing over a bad file.
+        status('RECORDED AT ONLY ' + fps.toFixed(0) + ' FPS — THIS TAKE WILL LOOK FROZEN. '
+             + 'KEEP THIS TAB VISIBLE AND IN FRONT, THEN RECORD AGAIN.', 'rec');
+      } else {
+        status('SAVED — ' + (blob.size / 1048576).toFixed(1) + ' MB AT ' + fps.toFixed(0)
+             + ' FPS. CONVERT TO MP4 FOR INSTAGRAM (SEE README).', 'on');
+      }
       recBtn.disabled = false;
       recBtn.textContent = '● RECORD VIDEO';
       recTrack = null;
       Score.setMuted(muted);
     };
 
+    recFrames = 0;
     recorder.start(250);
     recBtn.disabled = true;
     recBtn.textContent = '● RECORDING…';
-    status('RECORDING — LEAVE THIS TAB VISIBLE FOR 58 SECONDS. DO NOT SWITCH AWAY.', 'rec');
+    status('RECORDING — KEEP THIS TAB VISIBLE AND IN FRONT FOR '
+         + DUR.toFixed(0) + ' SECONDS. SWITCHING AWAY FREEZES THE CAPTURE.', 'rec');
     start();
   });
 
@@ -272,8 +302,17 @@
     if (e.key.toLowerCase() === 'm') { muteBtn.click(); }
   });
 
+  document.getElementById('cut-full').classList.toggle('on', cutName === 'full');
+  document.getElementById('cut-reel').classList.toggle('on', cutName === 'reel');
+  document.getElementById('cut-full').addEventListener('click', function () {
+    if (cutName !== 'full') location.search = '';
+  });
+  document.getElementById('cut-reel').addEventListener('click', function () {
+    if (cutName !== 'reel') location.search = '?cut=30';
+  });
+
   reset();
-  status('58 SECONDS · 1080×1920 · ORIGINAL SCORE');
+  status(CUT.label);
 })();
 </script>
 </body>
